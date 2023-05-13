@@ -64,7 +64,7 @@ export default class RolloverTodosPlugin extends Plugin {
     return dailyNotesEnabled || periodicNotesEnabled;
   }
 
-  getLastDailyNote() {
+  getLastDailyNote(newFile) {
     const { moment } = window;
     let { folder, format } = getDailyNoteSettings();
 
@@ -73,6 +73,28 @@ export default class RolloverTodosPlugin extends Plugin {
 
     const dailyNoteRegexMatch = new RegExp("^" + folder + "(.*).md$");
     const todayMoment = moment();
+
+    const newNoteName = moment(newFile.stat.ctime).format(format);
+    if (!moment(newFile.basename).isValid()) return;
+
+    const lastDailyNote = this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => file.path.startsWith(folder))
+      .filter((file) =>
+        moment(
+          file.path.replace(dailyNoteRegexMatch, "$1"),
+          format,
+          true
+        ).isValid()
+      )
+      .filter((file) => file.basename)
+      .find(
+        (file) =>
+          file.basename ===
+          moment(newFile.basename).subtract(1, "day").format(format)
+      );
+
+    return lastDailyNote;
 
     // get all notes in directory that aren't null
     const dailyNoteFiles = this.app.vault
@@ -178,7 +200,6 @@ export default class RolloverTodosPlugin extends Plugin {
     const filePathConstructed = `${folder}${
       folder == "" ? "" : "/"
     }${todayFormatted}.${file.extension}`;
-    if (filePathConstructed !== file.path) return;
 
     // was just created
     if (
@@ -198,7 +219,7 @@ export default class RolloverTodosPlugin extends Plugin {
         this.settings;
 
       // check if there is a daily note from yesterday
-      const lastDailyNote = this.getLastDailyNote();
+      const lastDailyNote = this.getLastDailyNote(file);
       if (!lastDailyNote) return;
 
       // TODO: Rollover to subheadings (optional)
